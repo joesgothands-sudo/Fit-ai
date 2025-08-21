@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1220">
+<title>FitAI — Movement Risk & Coaching (PWA)</title>
+<style>
+  :root{
+    --bg:#0f1220;
+    --card:#171a2b;
+    --muted:#8ea0bf;
+    --text:#e9f0ff;
+    --accent:#7ae582;
+    --accent2:#6ea8fe;
+    --warn:#ffb74d;
+    --danger:#ff6b6b;
+    --ok:#00c853;
+    --chip:#242741;
+    --shadow: 0 10px 24px rgba(0,0,0,.35);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:linear-gradient(180deg,#0b0e1a 0%, #121734 100%);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color:var(--text);
+  }
+  .app{
+    display:grid; gap:16px; padding:16px; max-width:1400px; margin:0 auto;
+    grid-template-columns: 320px 1fr 360px; grid-template-rows:auto 1fr;
+  }
+  header{
+    grid-column:1/-1; display:flex; align-items:center; gap:12px;
+    padding:14px 18px; background:var(--card); border-radius: var(--radius);
+    box-shadow:var(--shadow); position:sticky; top:8px; z-index:3;
+  }
+  header h1{font-size:20px; margin:0; letter-spacing:.3px}
+  header .tag{background:var(--chip); padding:6px 10px; border-radius:999px; color:var(--muted); font-size:12px}
+  header .spacer{flex:1}
+  header button, .btn{
+    border:0; color:#08121a; background:var(--accent);
+    padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer;
+  }
+  header .ghost{background:#202646; color:var(--text)}
+  .panel{
+    background:var(--card); border-radius: var(--radius); box-shadow:var(--shadow); padding:14px;
+  }
+  .controls{display:flex; flex-direction:column; gap:12px; max-height:calc(100vh - 120px); overflow:auto}
+  .group{background:#141935; border:1px solid #2a2f55; border-radius:14px; padding:12px}
+  .group h3{margin:0 0 8px 0; font-size:14px; color:#b9c8ff; letter-spacing:.2px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; background:var(--chip); border-radius:12px}
+  select, input[type="range"], input[type="text"]{
+    width:100%; background:#0e1330; color:var(--text); border:1px solid #2b335d;
+    border-radius:12px; padding:10px;
+  }
+  .toggle{
+    display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;
+  }
+  .toggle input{appearance:none; width:44px; height:26px; background:#2a2f55; border-radius:999px; position:relative; outline:0; transition:.2s}
+  .toggle input:before{
+    content:""; position:absolute; left:3px; top:3px; width:20px; height:20px; background:#fff; border-radius:50%; transition:.2s;
+  }
+  .toggle input:checked{background:linear-gradient(90deg,var(--accent2),var(--accent))}
+  .toggle input:checked:before{transform:translateX(18px)}
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    background:var(--chip); padding:10px 12px; border-radius:12px; cursor:pointer;
+    border:1px solid #2a2f55; color:#muted; font-size:13px; transition:.15s;
+  }
+  .chip.active{background:linear-gradient(180deg,#27306d,#1a2051); color:#e8f1ff; border-color:#4b56a3}
+  .main{position:relative; display:flex; flex-direction:column; gap:12px}
+  .stage{position:relative; border-radius:16px; overflow:hidden; background:#0a0d22; height:min(65vh,560px); border:1px solid #2a2f55}
+  video, canvas{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000}
+  .legend{position:absolute; right:10px; top:10px; display:flex; gap:8px; flex-wrap:wrap}
+  .pill{padding:8px 10px; background:#0009; border:1px solid #2a2f55; color:#dfe7ff; border-radius:10px; font-size:12px}
+  .actions{display:flex; gap:8px; flex-wrap:wrap}
+  .actions .btn{background:var(--accent2); color:#061022}
+  .actions .danger{background:var(--danger); color:#101010}
+  .analysis{display:flex; flex-direction:column; gap:12px}
+  .score{
+    background:linear-gradient(180deg,#1a2147,#151a38); border:1px solid #2c3566; padding:12px; border-radius:12px;
+  }
+  .score h4{margin:0 0 6px 0; font-size:14px; color:#bcd2ff}
+  .score .val{font-size:28px; font-weight:800}
+  .bad{color:#ff6b6b} .warn{color:#ffb74d} .good{color:#7ae582}
+  .list{display:grid; grid-template-columns:1fr; gap:8px}
+  .item{background:#242741; border:1px solid #2a2f55; padding:10px; border-radius:12px; font-size:13px}
+  footer{grid-column:1/-1; opacity:.8; padding:8px 2px; text-align:center; color:#9fb1d9; font-size:12px}
+  .disclaimer{font-size:12px; color:#9fb1d9}
+  .small{font-size:12px; color:#b7c8f8}
+  .kbd{padding:2px 6px; border-radius:6px; background:#0c1133; border:1px solid #2a2f55; color:#cfe0ff}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="panel">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 3h4l2 4h6a2 2 0 0 1 2 2v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V3z" stroke="#7ae582" stroke-width="1.5"/><circle cx="9" cy="12" r="1.6" fill="#6ea8fe"/><circle cx="13" cy="12" r="1.6" fill="#6ea8fe"/><path d="M7.5 16c1.3 1.5 3.7 1.5 5 0" stroke="#7ae582" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <h1>FitAI — Movement Risk & Coaching</h1>
+      <span class="tag">PWA • on-device • private</span>
+      <div class="spacer"></div>
+      <button class="ghost" id="toggleTheme">Theme</button>
+      <button id="printReport">Export PDF</button>
+    </header>
+
+    <aside class="panel controls" id="controls">
+      <div class="group">
+        <h3>Consent & Privacy</h3>
+        <label class="toggle"><input id="consent" type="checkbox"/><span>I consent to on-device analysis</span></label>
+        <label class="toggle"><input id="storeMetrics" type="checkbox" checked/><span>Save metrics (local only)</span></label>
+        <div class="small">Video never leaves your device. Metrics are stored in your browser only.</div>
+      </div>
+      <div class="group">
+        <h3>Capture</h3>
+        <div class="grid">
+          <button class="btn" id="startCam">🎥 Use Camera</button>
+          <label class="btn" style="text-align:center; cursor:pointer;">📼 Upload
+            <input id="uploader" type="file" accept="video/*" style="display:none;">
+          </label>
+        </div>
+        <div class="row">
+          <span>Resolution</span>
+          <select id="resolution">
+            <option value="1280x720">720p</option>
+            <option value="1920x1080">1080p</option>
+            <option value="640x480">480p</option>
+          </select>
+        </div>
+        <div class="row"><span>View</span><select id="viewAngle"><option>Front</option><option>Side</option><option>Back</option></select></div>
+        <div class="row"><span>Activity</span>
+          <select id="activity"><option>Walk</option><option>Run</option><option>Jump</option><option>Squat</option><option>Lunge</option><option>Push-up</option></select>
+        </div>
+        <div class="row"><span>Feedback Voice</span><label class="toggle"><input id="speak" type="checkbox"/><span>Enabled</span></label></div>
+      </div>
+
+      <div class="group">
+        <h3>Focus Points</h3>
+        <div class="chips" id="focusChips"></div>
+        <div class="small">Tip: toggle the joints/regions you want extra attention on.</div>
+      </div>
+
+      <div class="group">
+        <h3>Analysis Options</h3>
+        <div class="row"><span>Show skeleton</span><label class="toggle"><input id="showSkel" type="checkbox" checked/><span>On</span></label></div>
+        <div class="row"><span>Sensitivity</span><input id="sensitivity" type="range" min="0.5" max="2" step="0.1" value="1" /></div>
+        <div class="row"><span>On-device compute</span><label class="toggle"><input id="edge" type="checkbox" checked/><span>Edge</span></label></div>
+        <div class="row"><span>Lighting assist</span><label class="toggle"><input id="lighting" type="checkbox"/><span>Auto</span></label></div>
+      </div>
+
+      <div class="group">
+        <h3>Quick Actions</h3>
+        <div class="grid">
+          <button class="btn" id="calibrate">Calibrate</button>
+          <button class="btn" id="saveSession">Save Session</button>
+        </div>
+        <button class="btn" id="stopAll" style="width:100%; margin-top:8px; background:#ff6b6b; color:#101010;">Stop</button>
+      </div>
+
+      <div class="group disclaimer"><strong>Not medical advice.</strong> For pain or injury, consult a licensed clinician.</div>
+    </aside>
+
+    <main class="panel main">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="legend" id="legend">
+          <span class="pill">Model: MoveNet (client-side)</span>
+          <span class="pill" id="fpsPill">FPS —</span>
+          <span class="pill" id="statusPill">Status: idle</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="speakNow">🔊 Speak summary</button>
+        <button class="btn" id="clearData">🗑️ Clear saved metrics</button>
+      </div>
+      <div class="panel analysis">
+        <div class="score"><h4>Overall Symmetry</h4><div class="val" id="symmetryVal">—</div></div>
+        <div class="grid">
+          <div class="score"><h4>Knee Valgus Index</h4><div class="val" id="kneeVal">—</div></div>
+          <div class="score"><h4>Trunk Lean (°)</h4><div class="val" id="trunkVal">—</div></div>
+        </div>
+        <div class="list" id="insights"></div>
+        <div class="list" id="prescriptions"></div>
+        <canvas id="progressChart" height="140"></canvas>
+      </div>
+    </main>
+
+    <aside class="panel analysis" id="right">
+      <div class="group">
+        <h3>Live Joint Angles (°)</h3>
+        <div class="list" id="anglesList">
+          <div class="item">Knee (L/R): <span id="angKnees">—</span></div>
+          <div class="item">Hip (L/R): <span id="angHips">—</span></div>
+          <div class="item">Elbow (L/R): <span id="angElbows">—</span></div>
+          <div class="item">Cadence (est.): <span id="cadence">—</span></div>
+        </div>
+      </div>
+      <div class="group">
+        <h3>Recommendations</h3>
+        <ol class="list" id="recsList">
+          <li class="item">Start capture to generate personalized coaching.</li>
+        </ol>
+      </div>
+      <div class="group">
+        <h3>Session Notes</h3>
+        <input id="notes" type="text" placeholder="e.g., Right knee felt tight today…" />
+        <div class="small">Press <span class="kbd">Enter</span> to save into report.</div>
+      </div>
+    </aside>
+
+    <footer>© 2025 FitAI — PWA prototype</footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@3.4.0/dist/pose-detection.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+
+/* ========= FITAI PROTOTYPE ========= */
+const el = id => document.getElementById(id);
+const video = el('video'), canvas = el('overlay'), ctx = canvas.getContext('2d');
+const statusPill = el('statusPill'), fpsPill = el('fpsPill');
+let detector, animId, lastTs=performance.now(), fps=0;
+let running=false, usingCamera=false, poses=[], cadence=0;
+let focus = new Set(['ankles','knees','hips','spine','shoulders']); 
+let chart, series = loadSeries();
+
+const bodyParts = [
+  ['feet','Feet'],['ankles','Ankles'],['knees','Knees'],['hips','Hips'],
+  ['spine','Spine/Lower back'],['shoulders','Shoulders'],['elbows','Elbows'],
+  ['wrists','Wrists'],['neck','Head/Neck']
+];
+
+function buildFocusChips(){
+  const cont = el('focusChips'); cont.innerHTML='';
+  bodyParts.forEach(([key,label])=>{
+    const c = document.createElement('button');
+    c.className='chip'+(focus.has(key)?' active':'');
+    c.textContent=label; c.dataset.key=key;
+    c.onclick = ()=>{ if (focus.has(key)) focus.delete(key); else focus.add(key);
+      c.classList.toggle('active');};
+    cont.appendChild(c);
+  });
+}
+buildFocusChips();
+
+el('toggleTheme').onclick=()=>{
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('--bg') === '#0f1220';
+  if(dark){
+    document.documentElement.style.setProperty('--bg','#f2f6ff');
+    document.documentElement.style.setProperty('--card','#ffffff');
+    document.documentElement.style.setProperty('--text','#101425');
+    document.documentElement.style.setProperty('--chip','#eef2ff');
+  }else{
+    document.location.reload();
+  }
+};
+
+function sizeCanvas(){
+  canvas.width = document.getElementById('stage').clientWidth;
+  canvas.height = document.getElementById('stage').clientHeight;
+}
+new ResizeObserver(sizeCanvas).observe(document.getElementById('stage'));
+
+async function loadModel(){
+  status('loading model…');
+  try{
+    detector = await poseDetection.createDetector(
+      poseDetection.SupportedModels.MoveNet,
+      {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING}
+    );
+    status('model ready');
+  }catch(e){
+    status('model failed (offline?) — demo mode', true);
+  }
+}
+loadModel();
+
+async function startCamera(){
+  if(!el('consent').checked){ alert('Please consent to on-device analysis.'); return; }
+  const [w,h] = el('resolution').value.split('x').map(Number);
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{width:w, height:h, facingMode:'user'}, audio:false });
+    video.srcObject = stream; usingCamera=true;
+    await video.play(); run();
+  }catch(e){ alert('Camera access blocked. Try uploading a video instead.'); }
+}
+async function loadFile(file){
+  video.srcObject = null; usingCamera=false;
+  video.src = URL.createObjectURL(file);
+  await video.play(); run();
+}
+el('startCam').onclick=startCamera;
+el('uploader').onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0]); };
+
+function status(t, warn=false){ statusPill.textContent = 'Status: '+t; statusPill.style.color = warn?'#ffb74d':''; }
+
+function drawKeypoint(kp, color='#7ae582', r=5){
+  if(!kp || kp.score<0.3) return;
+  const {x,y} = toCanvasXY(kp.x, kp.y);
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=color; ctx.fill();
+}
+function line(a,b,color='#6ea8fe', w=4){
+  if(!a || !b || a.score<0.3 || b.score<0.3) return;
+  const A=toCanvasXY(a.x,a.y), B=toCanvasXY(b.x,b.y);
+  ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y);
+  ctx.lineWidth=w; ctx.strokeStyle=color; ctx.stroke();
+}
+function toCanvasXY(x,y){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cw = canvas.width, ch = canvas.height;
+  const vr = vw/vh, cr = cw/ch;
+  let scale, offsetX=0, offsetY=0;
+  if(cr > vr){ scale = ch/vh; offsetX = (cw - vw*scale)/2; }
+  else{ scale = cw/vw; offsetY = (ch - vh*scale)/2; }
+  return {x: x*scale + offsetX, y: y*scale + offsetY};
+}
+function angle(a,b,c){
+  if(!a||!b||!c||a.score<0.3||b.score<0.3||c.score<0.3) return NaN;
+  const ab=[a.x-b.x,a.y-b.y], cb=[c.x-b.x,c.y-b.y];
+  const dot=ab[0]*cb[0]+ab[1]*cb[1];
+  const mag1=Math.hypot(...ab), mag2=Math.hypot(...cb);
+  return Math.round((Math.acos(Math.min(1,Math.max(-1,dot/(mag1*mag2))))*180/Math.PI));
+}
+function verticalAngle(a,b){
+  if(!a||!b||a.score<0.3||b.score<0.3) return NaN;
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const ang = Math.atan2(dx, dy) * 180/Math.PI;
+  return Math.round(Math.abs(ang));
+}
+
+const LINKS = [
+  ['left_shoulder','right_shoulder'],['left_hip','right_hip'],
+  ['left_shoulder','left_elbow'],['left_elbow','left_wrist'],
+  ['right_shoulder','right_elbow'],['right_elbow','right_wrist'],
+  ['left_hip','left_knee'],['left_knee','left_ankle'],
+  ['right_hip','right_knee'],['right_knee','right_ankle'],
+  ['left_shoulder','left_hip'],['right_shoulder','right_hip']
+];
+
+async function run(){
+  if(running) return; running=true; status('warming up…');
+  sizeCanvas();
+  const step = async ()=>{
+    if(!running) return;
+    const now=performance.now(); const dt = now-lastTs; lastTs=now; fps = 1000/dt; fpsPill.textContent = 'FPS ' + (isFinite(fps)? fps.toFixed(0):'—');
+    let pose=null;
+    if(detector && (video.readyState>=2)){
+      try{
+        const est = await detector.estimatePoses(video,{flipHorizontal: usingCamera});
+        pose = est[0]||null;
+      }catch(e){}
+    }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if(pose){
+      const kpMap={}; (pose.keypoints||pose.keypoints3D||[]).forEach(k=>kpMap[k.name]=k);
+      if(el('showSkel').checked){
+        LINKS.forEach(([a,b])=> line(kpMap[a], kpMap[b]));
+        Object.values(kpMap).forEach(k=> drawKeypoint(k, '#7ae582'));
+      }
+      const kneeL = angle(kpMap['left_hip'], kpMap['left_knee'], kpMap['left_ankle']);
+      const kneeR = angle(kpMap['right_hip'], kpMap['right_knee'], kpMap['right_ankle']);
+      const hipL  = angle(kpMap['left_shoulder'], kpMap['left_hip'], kpMap['left_knee']);
+      const hipR  = angle(kpMap['right_shoulder'], kpMap['right_hip'], kpMap['right_knee']);
+      const elbowL= angle(kpMap['left_shoulder'], kpMap['left_elbow'], kpMap['left_wrist']);
+      const elbowR= angle(kpMap['right_shoulder'], kpMap['right_elbow'], kpMap['right_wrist']);
+
+      el('angKnees').textContent = fmtPair(kneeL,kneeR);
+      el('angHips').textContent  = fmtPair(hipL,hipR);
+      el('angElbows').textContent= fmtPair(elbowL,elbowR);
+
+      const S = simPair(kneeL,kneeR,40) * .5 + simPair(hipL,hipR,40)*.3 + simPair(elbowL,elbowR,40)*.2;
+      setVal('symmetryVal', Math.round(S*100), '%');
+
+      const kvL = kneeValgus(kpMap['left_hip'], kpMap['left_knee'], kpMap['left_ankle']);
+      const kvR = kneeValgus(kpMap['right_hip'], kpMap['right_knee'], kpMap['right_ankle']);
+      setVal('kneeVal', ((Math.abs(kvL)+Math.abs(kvR))/2).toFixed(1), '');
+
+      const trunk = trunkLean(kpMap['left_shoulder'], kpMap['right_shoulder'], kpMap['left_hip'], kpMap['right_hip']);
+      setVal('trunkVal', trunk.toFixed(1), '°');
+
+      cadence = estimateCadence(kpMap['left_ankle'], kpMap['right_ankle']);
+      el('cadence').textContent = isFinite(cadence)? (cadence.toFixed(0) + ' spm') : '—';
+
+      renderInsights(S, (Math.abs(kvL)+Math.abs(kvR))/2, trunk);
+      renderRecommendations(S, kvL, kvR, trunk);
+    }
+    animId = requestAnimationFrame(step);
+  };
+  step();
+}
+function stopAll(){
+  running=false; cancelAnimationFrame(animId);
+  status('stopped');
+  if(video.srcObject){
+    video.srcObject.getTracks().forEach(t=>t.stop());
+    video.srcObject=null;
+  }
+}
+el('stopAll').onclick = stopAll;
+
+function simPair(a,b,range){ if(!isFinite(a)||!isFinite(b)) return 0.5; const diff = Math.min(range, Math.abs(a-b)); return 1 - (diff/range); }
+function kneeValgus(hip,knee,ankle){
+  if([hip,knee,ankle].some(k=>!k||k.score<0.3)) return NaN;
+  const sign = ((knee.x - ankle.x) - (hip.x - ankle.x));
+  const norm = Math.abs(hip.x - ankle.x) || 1;
+  return (sign / norm) * 50;
+}
+function trunkLean(ls,rs,lh,rh){
+  if([ls,rs,lh,rh].some(k=>!k||k.score<0.3)) return NaN;
+  const midS = {x:(ls.x+rs.x)/2, y:(ls.y+rs.y)/2, score:1};
+  const midH = {x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2, score:1};
+  return verticalAngle(midS, midH);
+}
+let ankleHist = []; let lastStepTime=0;
+function estimateCadence(la,ra){
+  const t = performance.now();
+  const a = (la&&la.score>0.3)? la.y : NaN;
+  const b = (ra&&ra.score>0.3)? ra.y : NaN;
+  const y = isFinite(a)&&isFinite(b)? (a+b)/2 : NaN;
+  if(isFinite(y)){
+    ankleHist.push([t,y]); if(ankleHist.length>200) ankleHist.shift();
+    if(ankleHist.length>3){
+      const [t1,y1]=ankleHist[ankleHist.length-3];
+      const [t2,y2]=ankleHist[ankleHist.length-2];
+      const [t3,y3]=ankleHist[ankleHist.length-1];
+      if((y1>y2 && y2<y3) || (y1<y2 && y2>y3)){
+        if(lastStepTime){ const period = (t2-lastStepTime)/1000; cadence = 60/Math.max(period, .1); }
+        lastStepTime=t2;
+      }
+    }
+  }
+  return cadence;
+}
+function fmtPair(a,b){ return (isFinite(a)?a:'—') + ' / ' + (isFinite(b)?b:'—'); }
+function setVal(id,val,suffix){
+  const elv = el(id);
+  if(!isFinite(val)){ elv.textContent='—'; return; }
+  elv.textContent = val + (suffix||'');
+  elv.className = 'val';
+  const num = Number(val);
+  if(id==='symmetryVal'){ if(num>=90) elv.classList.add('good'); else if(num>=75) elv.classList.add('warn'); else elv.classList.add('bad'); }
+  if(id==='kneeVal'){ if(num<15) elv.classList.add('good'); else if(num<30) elv.classList.add('warn'); else elv.classList.add('bad'); }
+  if(id==='trunkVal'){ if(num<8) elv.classList.add('good'); else if(num<15) elv.classList.add('warn'); else elv.classList.add('bad'); }
+}
+function renderInsights(sym, kv, trunk){
+  const L = el('insights'); L.innerHTML='';
+  const items=[];
+  if(isFinite(sym)){ items.push(scoreLine(sym,'Symmetry', v=>v>=90?'Excellent bilateral control': v>=75?'Minor asymmetry':'Noticeable side bias; drill unilateral control')); }
+  if(isFinite(kv)){ items.push(scoreLine(100-kv,'Knee control', v=>v>=85?'Good frontal-plane control': v>=70?'Watch for knees caving in':'High valgus tendency during loading')); }
+  if(isFinite(trunk)){ items.push(scoreLine(100-trunk,'Trunk stability', v=>v>=92?'Neutral trunk':'Forward/side lean — core & hip strategy')); }
+  items.forEach(html=>{ const d=document.createElement('div'); d.className='item'; d.innerHTML=html; L.appendChild(d); });
+}
+function scoreLine(val,label,descFn){
+  const d = descFn(Math.max(0,Math.min(100,val)));
+  return `<strong>${label}:</strong> ${d}`;
+}
+function renderRecommendations(sym, kvL, kvR, trunk){
+  const R = el('recsList'); R.innerHTML='';
+  const a=[];
+  const act = el('activity').value;
+  if(sym<0.85) a.push('Add 2×/wk unilateral work (split squats, single-leg RDLs). Tempo: 3-1-1.');
+  if(Math.abs(kvL)>20 || Math.abs(kvR)>20) a.push('Cue “knees track over 2nd toe”, band-resisted squats, clam shells, lateral walks (2×15).');
+  if(trunk>12) a.push('Brace strategy: exhale-brace, wall dead bug 2×8/side, side plank 2×30s.');
+  if(act==='Run') a.push('Increase cadence by ~5% and keep tibia more vertical on landing; try soft ground drills.');
+  if(act==='Jump') a.push('Practice snap-down landings: tall → quarter-squat, knees out, quiet feet, 3×5.');
+  if(act==='Squat') a.push('Heels-down, tripod foot; box squats to consistent depth, 3×5.');
+  if(act==='Push-up') a.push('Hands under shoulders, ribs down; elevate hands if trunk sags.');
+  if(act==='Lunge') a.push('Shorten stride and keep front knee stacked; rear-foot-elevated variation 3×8.');
+  a.forEach(t=>{ const li=document.createElement('li'); li.className='item'; li.textContent=t; R.appendChild(li); });
+  const P = document.getElementById('prescriptions'); P.innerHTML='';
+  a.slice(0,3).forEach(t=>{ const d=document.createElement('div'); d.className='item'; d.textContent='Prescription: '+t; P.appendChild(d); });
+}
+
+function loadSeries(){ try{ return JSON.parse(localStorage.getItem('fitai_series')||'[]'); }catch(_){ return []; } }
+function saveSeries(){ if(document.getElementById('storeMetrics').checked) localStorage.setItem('fitai_series', JSON.stringify(series)); }
+function addPoint(sym,kv,trunk){
+  if(!isFinite(sym)||!isFinite(kv)||!isFinite(trunk)) return;
+  series.push({t: new Date().toISOString(), sym: Math.round(sym*100), kv: Number(kv.toFixed(1)), trunk: Number(trunk.toFixed(1)), note: document.getElementById('notes').value||''});
+  if(series.length>60) series.shift();
+  saveSeries(); drawChart();
+}
+function clearData(){ localStorage.removeItem('fitai_series'); series=[]; drawChart(); }
+document.getElementById('clearData').onclick=clearData;
+
+function drawChart(){
+  const labels = series.map(s=> new Date(s.t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  const data1 = series.map(s=> s.sym), data2 = series.map(s=> 100 - Math.min(100, s.kv)), data3 = series.map(s=> 100 - Math.min(100, s.trunk));
+  if(!window.Chart) return;
+  if(!window._fitChart){
+    window._fitChart = new Chart(document.getElementById('progressChart'), {
+      type:'line',
+      data:{labels, datasets:[
+        {label:'Symmetry', data:data1},
+        {label:'Knee control', data:data2},
+        {label:'Trunk neutrality', data:data3}
+      ]},
+      options:{
+        plugins:{ legend:{labels:{color:'#cfe0ff'}}},
+        scales:{ x:{ticks:{color:'#cfe0ff'}}, y:{ticks:{color:'#cfe0ff'}, min:0, max:100}},
+      }
+    });
+  }else{
+    const chart = window._fitChart;
+    chart.data.labels = labels; chart.data.datasets[0].data=data1;
+    chart.data.datasets[1].data=data2; chart.data.datasets[2].data=data3; chart.update();
+  }
+}
+drawChart();
+
+document.getElementById('saveSession').onclick = ()=>{
+  const sym = parseFloat(document.getElementById('symmetryVal').textContent)||NaN;
+  const kv = parseFloat(document.getElementById('kneeVal').textContent)||NaN;
+  const tr = parseFloat(document.getElementById('trunkVal').textContent)||NaN;
+  addPoint(sym/100, kv, tr);
+};
+
+document.getElementById('notes').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); const sym=parseFloat(document.getElementById('symmetryVal').textContent)||NaN;
+    const kv=parseFloat(document.getElementById('kneeVal').textContent)||NaN; const tr=parseFloat(document.getElementById('trunkVal').textContent)||NaN; addPoint(sym/100,kv,tr); e.target.value='';}
+});
+
+let smooth=0.6;
+document.getElementById('calibrate').onclick=()=>{
+  const s = Number(prompt('Smoothing (0-1). Lower = snappier, higher = smoother', smooth));
+  if(isFinite(s) && s>0 && s<=1) smooth=s;
+};
+
+function speak(text){
+  if(!document.getElementById('speak').checked) return;
+  const u = new SpeechSynthesisUtterance(text); u.rate=1.05; u.pitch=1;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+document.getElementById('speakNow').onclick=()=>{
+  const sym = document.getElementById('symmetryVal').textContent;
+  const kv = document.getElementById('kneeVal').textContent;
+  const tr = document.getElementById('trunkVal').textContent;
+  speak(`Summary. Symmetry ${sym} percent. Knee control index ${kv}. Trunk lean ${tr} degrees.`);
+};
+
+document.getElementById('printReport').onclick=()=>{ window.print(); };
+
+function setActivityPreset(){
+  const act = document.getElementById('activity').value;
+  if(act==='Run' || act==='Walk'){ focus = new Set(['ankles','knees','hips','spine']); }
+  if(act==='Jump'){ focus = new Set(['knees','hips','spine']); }
+  if(act==='Squat'){ focus = new Set(['feet','ankles','knees','hips','spine']); }
+  if(act==='Push-up'){ focus = new Set(['shoulders','elbows','wrists','spine']); }
+  if(act==='Lunge'){ focus = new Set(['knees','hips','spine']); }
+  buildFocusChips();
+}
+document.getElementById('activity').onchange=setActivityPreset;
+
+document.addEventListener('keydown', e=>{
+  if(e.key===' '){ e.preventDefault(); running? stopAll(): startCamera(); }
+});
+
+status('idle — start camera or upload');
+</script>
+</body>
+</html>
